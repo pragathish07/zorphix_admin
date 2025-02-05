@@ -31,8 +31,13 @@ export default function LoginPage() {
       } else {
         setError("Access denied. You are not an admin.");
       }
-    } catch (err: any) {
+    } catch (err) {
+        if (err instanceof Error) {
       setError(err.message || "Failed to login. Check your credentials.");
+    }
+    else{
+        setError("unexpected error happened")
+    }
     } finally {
       setLoading(false);
     }

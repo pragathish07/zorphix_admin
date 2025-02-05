@@ -23,6 +23,17 @@ interface UserType {
   registeredEvents?: { name: string }[];
 }
 
+interface FirestoreUser {
+  uid: string;
+  name?: string;
+  email?: string;
+  contactNo?: string;
+  collegeName?: string;
+  department?: string;
+  registeredEvents?: { name: string }[];
+  isAdmin?: boolean;
+}
+
 export default function Home() {
 
   const router = useRouter();
@@ -33,13 +44,15 @@ export default function Home() {
   const [sortField, setSortField] = useState("registeredEvents");
   const [selectedEvent, setSelectedEvent] = useState("");
 
+    
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        setUser(user);
+    const unsubscribe = onAuthStateChanged(auth, async (Authuser) => {
+      if (Authuser) {
+        setUser(Authuser);
         try {
           const usersCollection = collection(db, "users");
-          const q = query(usersCollection, where("uid", "==", user.uid));
+          const q = query(usersCollection, where("uid", "==", Authuser.uid));
           const querySnapshot = await getDocs(q);
 
           if (!querySnapshot.empty) {
@@ -218,7 +231,7 @@ export default function Home() {
                                     <td className="px-6 py-2">
                                         {user.registeredEvents?.length ?? 0  ? (
                                             <div className="space-y-1 flex justify-center items-center">
-                                                {user.registeredEvents?.map((event: any, index: number) => (
+                                                {user.registeredEvents?.map((event:any, index: number) => (
                                                     <span 
                                                         key={index} 
                                                         className="bg-blue-100 text-blue-800 text-xs px-2 py-2 rounded mr-1 mb-1 text-center"
