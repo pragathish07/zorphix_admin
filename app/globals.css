@@ -19,3 +19,184 @@ body {
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+
+
+.admin-container {
+  
+  margin: 0 auto;
+  padding: 30px;
+  background-color: #f4f6f9;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.admin-container h1 {
+  text-align: center;
+  color: #2c3e50;
+  margin-bottom: 30px;
+  font-size: 2.5rem;
+  font-weight: 600;
+  border-bottom: 3px solid #3498db;
+  padding-bottom: 15px;
+}
+
+.sort-options {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-bottom: 20px;
+  background-color: #fff;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.sort-options label {
+  font-size: 1.2rem;
+  margin-right: 15px;
+  color: #34495e;
+  font-weight: 500;
+}
+
+.sort-options select {
+  padding: 8px 12px;
+  border: 1px solid #bdc3c7;
+  border-radius: 6px;
+  background-color: #f8f9fa;
+  color: black;
+  font-size: 1.2rem;
+  transition: all 0.3s ease;
+}
+
+.sort-options select:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background-color: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.admin-table thead {
+  background-color: #3498db;
+  color: white;
+}
+
+.admin-table th {
+
+  padding: 15px;
+  text-align: left;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 1.5rem;
+}
+
+.admin-table tbody tr {
+  font-size: 2rem;
+  transition: background-color 0.3s ease;
+}
+
+.admin-table tbody tr:nth-child(even) {
+  background-color: #f1f5f9;
+}
+
+.admin-table tbody tr:hover {
+  background-color: #e6f2ff;
+}
+
+.admin-table td {
+  text-align: center;
+  padding: 15px;
+  color: #2c3e50;
+  border-bottom: 1px solid #e0e6ed;
+  font-size: 1.5rem;
+}
+
+.admin-table td:first-child {
+  font-weight: 500;
+}
+
+/* Loading State */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  color: #3498db;
+  font-size: 1.2rem;
+  font-weight: 500;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .admin-container {
+      padding: 15px;
+  }
+
+  .sort-options {
+      flex-direction: column;
+      align-items: flex-start;
+  }
+
+  .sort-options label {
+      margin-bottom: 10px;
+  }
+
+  .admin-table, 
+  .admin-table thead, 
+  .admin-table tbody, 
+  .admin-table th, 
+  .admin-table td, 
+  .admin-table tr {
+      display: block;
+  }
+
+  .admin-table thead {
+      display: none;
+  }
+
+  .admin-table tr {
+      margin-bottom: 10px;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .admin-table td {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #e0e6ed;
+      padding: 12px;
+  }
+
+  .admin-table td::before {
+      content: attr(data-label);
+      font-weight: bold;
+      color: #2c3e50;
+  }
+}
+
+.download-btn {
+  padding: 8px 15px;
+  background-color: #3498db;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition:0.3s ease;
+}
+
+.download-btn:hover {
+  background-color: #0056b3;
+}
+

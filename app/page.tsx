@@ -1,101 +1,248 @@
-import Image from "next/image";
+"use client"
+
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { auth, db } from "./firebaseConfig";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
+import * as XLSX from "xlsx";
+
+
+const availableEvents = [
+  "Xcoders", "Coin Quest", "Algo Rythms", "Caseathon", 
+  "Reverse Coding", "Virtuoso", "Thesis Precized", "Flip It Quiz It"
+];
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const router = useRouter();
+    const [user, setUser] = useState<any>(null);
+    const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+    const [users, setUsers] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [sortField, setSortField] = useState("registeredEvents");
+    const [selectedEvent, setSelectedEvent] = useState<string>("");
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                setUser(user);
+                try {
+                    const usersCollection = collection(db, "users");
+                    const q = query(usersCollection, where("uid", "==", user.uid));
+                    const querySnapshot = await getDocs(q);
+                    if (!querySnapshot.empty) {
+                        const userData = querySnapshot.docs[0].data();
+                        setIsAdmin(userData.isAdmin || false);
+                    } else {
+                        setIsAdmin(false);
+                    }
+                } catch (error) {
+                    console.error("Error checking admin status:", error);
+                    setIsAdmin(false);
+                }
+            } else {
+                router.push("/login");
+            }
+        });
+
+        return () => unsubscribe();
+    }, [router]);
+
+    useEffect(() => {
+        if (isAdmin) {
+            const fetchUsers = async () => {
+                try {
+                    const usersCollection = collection(db, "users");
+                    const q = query(usersCollection);
+                    const querySnapshot = await getDocs(q);
+                    const data = querySnapshot.docs.map((doc) => ({
+                        id: doc.id,
+                        ...doc.data(),
+                    }));
+                    setUsers(data);
+                } catch (error) {
+                    console.error("Error fetching users:", error);
+                } finally {
+                    setLoading(false);
+                }
+            };
+            fetchUsers();
+        }
+    }, [isAdmin]);
+
+    if (isAdmin === null) return <p className="loading_screen">Checking admin permissions...</p>;
+
+    if (!isAdmin) {
+        router.push("/");
+        return null;
+    }
+
+    // Sorting & Filtering Logic
+    let filteredUsers = [...users];
+
+    if (selectedEvent) {
+        const normalizedSelectedEvent = selectedEvent.trim().toLowerCase().replace(/[^a-z0-9]/gi, "");
+    
+        filteredUsers = filteredUsers.filter(user =>
+            user.registeredEvents?.some((event: any) => {
+                const normalizedEventName = event?.name?.trim().toLowerCase().replace(/[^a-z0-9]/gi, "");
+                return normalizedEventName === normalizedSelectedEvent;
+            })
+        );
+    }
+
+    filteredUsers.sort((a, b) => {
+        if (sortField === "registeredEvents") {
+            return (b.registeredEvents?.length || 0) - (a.registeredEvents?.length || 0);
+        } else if (sortField === "name") {
+            return (a.name || "").localeCompare(b.name || "");
+        } else if (sortField === "collegeName") {
+            return (a.collegeName || "").localeCompare(b.collegeName || "");
+        }
+        return 0;
+    });
+
+    // Export to Excel
+    const handleDownloadExcel = () => {
+        const exportData = filteredUsers.map((user) => ({
+            Name: user.name || "N/A",
+            Email: user.email || "N/A",
+            "Contact No": user.contactNo || "N/A",
+            College: user.collegeName || "N/A",
+            Department: user.department || "N/A",
+            "Registered Events": user.registeredEvents
+                ? user.registeredEvents.map((event: any) => event.name).join(", ")
+                : "None",
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(exportData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Users");
+        XLSX.writeFile(workbook, "users_data.xlsx");
+    };
+  return (
+        <div className="container mx-auto px-4 py-8 bg-white shadow-md rounded-lg text-black">
+            {/* Header */}
+            <h1 className="text-3xl font-bold text-gray-800 mb-6 text-center">
+                Admin Panel
+            </h1>
+
+            {/* Admin Actions */}
+            <div className="flex flex-col md:flex-row justify-between items-center mb-6 space-y-4 md:space-y-0">
+                {/* Sort Options */}
+                <div className="flex flex-col md:flex-row items-center space-y-2 md:space-x-4 w-full">
+                    {/* Sort By Dropdown */}
+                    <div className="flex items-center space-x-2">
+                        <label className="text-sm font-medium text-gray-700">
+                            Sort by:
+                        </label>
+                        <select 
+                            onChange={(e) => setSortField(e.target.value)}
+                            className="form-select block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                        >
+                            <option value="registeredEvents">Total Events Registered</option>
+                            <option value="name">Name</option>
+                            <option value="collegeName">College</option>
+                        </select>
+                    </div>
+
+                    {/* Event Filter */}
+                    <div className="flex items-center space-x-2">
+                        <label className="text-sm font-medium text-gray-700">
+                            Filter by Event:
+                        </label>
+                        <select 
+                            onChange={(e) => setSelectedEvent(e.target.value)}
+                            className="form-select block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                        >
+                            <option value="">All Events</option>
+                            {availableEvents.map(event => (
+                                <option key={event} value={event}>{event}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Download Button */}
+                    <button 
+                        onClick={handleDownloadExcel}
+                        className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors duration-300 flex items-center space-x-2"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-9.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                        <span>Download Excel</span>
+                    </button>
+                </div>
+            </div>
+
+            {/* Loading State */}
+            {loading ? (
+                <div className="flex justify-center items-center h-64">
+                    <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500"></div>
+                </div>
+            ) : (
+                // Table Section
+                <div className="overflow-x-auto">
+                    <table className="w-full divide-y divide-gray-200 shadow-sm rounded-lg overflow-hidden">
+                        {/* Table Head */}
+                        <thead className="bg-gray-50">
+                            <tr>
+                                {['Name', 'Email', 'Contact No', 'College', 'Department', 'Registered Events','No.of.events'].map((header) => (
+                                    <th 
+                                        key={header}
+                                        className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                    >
+                                        {header}
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
+
+                        {/* Table Body */}
+                        <tbody className="bg-white divide-y divide-gray-200">
+                            {filteredUsers.map((user) => (
+                                <tr 
+                                    key={user.id} 
+                                    className="hover:bg-gray-50 transition-colors duration-200"
+                                >
+                                    <td className="px-6 py-2 whitespace-nowrap">{user.name || "N/A"}</td>
+                                    <td className="px-6 py-2 whitespace-nowrap">{user.email || "N/A"}</td>
+                                    <td className="px-6 py-2 whitespace-nowrap">{user.contactNo || "N/A"}</td>
+                                    <td className="px-6 py-2 whitespace-nowrap">{user.collegeName || "N/A"}</td>
+                                    <td className="px-6 py-2 whitespace-nowrap">{user.department || "N/A"}</td>
+                                    
+                                    <td className="px-6 py-2">
+                                        {user.registeredEvents?.length > 0 ? (
+                                            <div className="space-y-1 flex justify-center items-center">
+                                                {user.registeredEvents.map((event: any, index: number) => (
+                                                    <span 
+                                                        key={index} 
+                                                        className="bg-blue-100 text-blue-800 text-xs px-2 py-2 rounded mr-1 mb-1 text-center"
+                                                    >
+                                                        {event.name}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <span className="text-center mr-1 mb-1">None</span>
+                                        )}
+                                    </td>
+                                    <td className="px-6 py-2 whitespace-nowrap">{user.registeredEvents?.length || "N/A"}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+
+                    {/* Empty State */}
+                    {filteredUsers.length === 0 && (
+                        <div className="text-center py-10 bg-gray-50">
+                            <p className="text-gray-500">No users found matching the current filter.</p>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+    );
 }
+
