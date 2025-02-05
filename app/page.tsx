@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "./firebaseConfig";
 import { collection, query, where, getDocs } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, User } from "firebase/auth";
 import * as XLSX from "xlsx";
 
 
@@ -13,114 +13,117 @@ const availableEvents = [
   "Reverse Coding", "Virtuoso", "Thesis Precized", "Flip It Quiz It"
 ];
 
+interface UserType {
+  uid: string;
+  name?: string;
+  email?: string;
+  contactNo?: string;
+  collegeName?: string;
+  department?: string;
+  registeredEvents?: { name: string }[];
+}
+
 export default function Home() {
 
   const router = useRouter();
-    const [user, setUser] = useState<any>(null);
-    const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-    const [users, setUsers] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [sortField, setSortField] = useState("registeredEvents");
-    const [selectedEvent, setSelectedEvent] = useState<string>("");
+  const [user, setUser] = useState<User | null>(null);
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [users, setUsers] = useState<UserType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sortField, setSortField] = useState("registeredEvents");
+  const [selectedEvent, setSelectedEvent] = useState("");
 
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                setUser(user);
-                try {
-                    const usersCollection = collection(db, "users");
-                    const q = query(usersCollection, where("uid", "==", user.uid));
-                    const querySnapshot = await getDocs(q);
-                    if (!querySnapshot.empty) {
-                        const userData = querySnapshot.docs[0].data();
-                        setIsAdmin(userData.isAdmin || false);
-                    } else {
-                        setIsAdmin(false);
-                    }
-                } catch (error) {
-                    console.error("Error checking admin status:", error);
-                    setIsAdmin(false);
-                }
-            } else {
-                router.push("/login");
-            }
-        });
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setUser(user);
+        try {
+          const usersCollection = collection(db, "users");
+          const q = query(usersCollection, where("uid", "==", user.uid));
+          const querySnapshot = await getDocs(q);
 
-        return () => unsubscribe();
-    }, [router]);
-
-    useEffect(() => {
-        if (isAdmin) {
-            const fetchUsers = async () => {
-                try {
-                    const usersCollection = collection(db, "users");
-                    const q = query(usersCollection);
-                    const querySnapshot = await getDocs(q);
-                    const data = querySnapshot.docs.map((doc) => ({
-                        id: doc.id,
-                        ...doc.data(),
-                    }));
-                    setUsers(data);
-                } catch (error) {
-                    console.error("Error fetching users:", error);
-                } finally {
-                    setLoading(false);
-                }
-            };
-            fetchUsers();
+          if (!querySnapshot.empty) {
+            const userData = querySnapshot.docs[0].data();
+            setIsAdmin(userData.isAdmin || false);
+          } else {
+            setIsAdmin(false);
+          }
+        } catch (error) {
+          console.error("Error checking admin status:", error);
+          setIsAdmin(false);
         }
-    }, [isAdmin]);
-
-    if (isAdmin === null) return <p className="loading_screen">Checking admin permissions...</p>;
-
-    if (!isAdmin) {
-        router.push("/");
-        return null;
-    }
-
-    // Sorting & Filtering Logic
-    let filteredUsers = [...users];
-
-    if (selectedEvent) {
-        const normalizedSelectedEvent = selectedEvent.trim().toLowerCase().replace(/[^a-z0-9]/gi, "");
-    
-        filteredUsers = filteredUsers.filter(user =>
-            user.registeredEvents?.some((event: any) => {
-                const normalizedEventName = event?.name?.trim().toLowerCase().replace(/[^a-z0-9]/gi, "");
-                return normalizedEventName === normalizedSelectedEvent;
-            })
-        );
-    }
-
-    filteredUsers.sort((a, b) => {
-        if (sortField === "registeredEvents") {
-            return (b.registeredEvents?.length || 0) - (a.registeredEvents?.length || 0);
-        } else if (sortField === "name") {
-            return (a.name || "").localeCompare(b.name || "");
-        } else if (sortField === "collegeName") {
-            return (a.collegeName || "").localeCompare(b.collegeName || "");
-        }
-        return 0;
+      } else {
+        router.push("/login");
+      }
     });
 
-    // Export to Excel
-    const handleDownloadExcel = () => {
-        const exportData = filteredUsers.map((user) => ({
-            Name: user.name || "N/A",
-            Email: user.email || "N/A",
-            "Contact No": user.contactNo || "N/A",
-            College: user.collegeName || "N/A",
-            Department: user.department || "N/A",
-            "Registered Events": user.registeredEvents
-                ? user.registeredEvents.map((event: any) => event.name).join(", ")
-                : "None",
-        }));
+    return () => unsubscribe();
+  }, [router]);
 
-        const worksheet = XLSX.utils.json_to_sheet(exportData);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Users");
-        XLSX.writeFile(workbook, "users_data.xlsx");
-    };
+  useEffect(() => {
+    if (isAdmin) {
+      const fetchUsers = async () => {
+        try {
+          const usersCollection = collection(db, "users");
+          const q = query(usersCollection);
+          const querySnapshot = await getDocs(q);
+
+          const data: UserType[] = querySnapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...(doc.data() as UserType),
+          }));
+          setUsers(data);
+        } catch (error) {
+          console.error("Error fetching users:", error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchUsers();
+    }
+  }, [isAdmin]);
+
+  if (isAdmin === null) return <p className="loading_screen">Checking admin permissions...</p>;
+
+  if (!isAdmin) {
+    router.push("/");
+    return null;
+  }
+
+  const filteredUsers = users.filter((user) => {
+    if (!selectedEvent) return true;
+    const normalizedSelectedEvent = selectedEvent.trim().toLowerCase().replace(/[^a-z0-9]/gi, "");
+    return user.registeredEvents?.some((event) => {
+      const normalizedEventName = event?.name.trim().toLowerCase().replace(/[^a-z0-9]/gi, "");
+      return normalizedEventName === normalizedSelectedEvent;
+    });
+  }).sort((a, b) => {
+    if (sortField === "registeredEvents") {
+      return (b.registeredEvents?.length || 0) - (a.registeredEvents?.length || 0);
+    } else if (sortField === "name") {
+      return (a.name || "").localeCompare(b.name || "");
+    } else if (sortField === "collegeName") {
+      return (a.collegeName || "").localeCompare(b.collegeName || "");
+    }
+    return 0;
+  });
+
+  const handleDownloadExcel = () => {
+    const exportData = filteredUsers.map((user) => ({
+      Name: user.name || "N/A",
+      Email: user.email || "N/A",
+      "Contact No": user.contactNo || "N/A",
+      College: user.collegeName || "N/A",
+      Department: user.department || "N/A",
+      "Registered Events": user.registeredEvents?.map((event) => event.name).join(", ") || "None",
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Users");
+    XLSX.writeFile(workbook, "users_data.xlsx");
+  };
+
   return (
         <div className="container mx-auto px-4 py-8 bg-white shadow-md rounded-lg text-black">
             {/* Header */}
@@ -203,7 +206,7 @@ export default function Home() {
                         <tbody className="bg-white divide-y divide-gray-200">
                             {filteredUsers.map((user) => (
                                 <tr 
-                                    key={user.id} 
+                                    key={user.uid} 
                                     className="hover:bg-gray-50 transition-colors duration-200"
                                 >
                                     <td className="px-6 py-2 whitespace-nowrap">{user.name || "N/A"}</td>
@@ -213,9 +216,9 @@ export default function Home() {
                                     <td className="px-6 py-2 whitespace-nowrap">{user.department || "N/A"}</td>
                                     
                                     <td className="px-6 py-2">
-                                        {user.registeredEvents?.length > 0 ? (
+                                        {user.registeredEvents?.length ?? 0  ? (
                                             <div className="space-y-1 flex justify-center items-center">
-                                                {user.registeredEvents.map((event: any, index: number) => (
+                                                {user.registeredEvents?.map((event: any, index: number) => (
                                                     <span 
                                                         key={index} 
                                                         className="bg-blue-100 text-blue-800 text-xs px-2 py-2 rounded mr-1 mb-1 text-center"
