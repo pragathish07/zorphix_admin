@@ -178,7 +178,7 @@ export default function Home() {
           <table className="w-full divide-y divide-gray-200 shadow-sm rounded-lg overflow-hidden">
             <thead className="bg-gray-50">
               <tr>
-                {['Name', 'Email', 'Contact No', 'College', 'Department', 'Registered Events', 'No.of.events'].map((header, index) => (
+                {['S.No','Name', 'Email', 'Contact No', 'College', 'Department', 'Registered Events', 'No.of.events'].map((header, index) => (
                   <th 
                     key={`header-${index}`}
                     className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
@@ -189,11 +189,12 @@ export default function Home() {
               </tr>
             </thead>
             <tbody key="table-body" className="bg-white divide-y divide-gray-200">
-              {filteredUsers.map((user) => (
+              {filteredUsers.map((user,index) => (
                 <tr 
                   key={user.uid} 
                   className="hover:bg-gray-50 transition-colors duration-200"
                 >
+                  <td className="px-6 py-2 whitespace-nowrap">{index+1}</td>
                   <td className="px-6 py-2 whitespace-nowrap">{user.name || "N/A"}</td>
                   <td className="px-6 py-2 whitespace-nowrap">{user.email || "N/A"}</td>
                   <td className="px-6 py-2 whitespace-nowrap">{user.contactNo || "N/A"}</td>
